@@ -1,0 +1,95 @@
+<!-- frontend/admin.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Sentiment Analytics</title>
+    <link rel="stylesheet" href="admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>📊 Sentiment Analytics Dashboard</h1>
+            <p class="subtitle">Real-time AI-powered conversation insights</p>
+        </header>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-value" id="totalUsers">-</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💬</div>
+                <div class="stat-content">
+                    <div class="stat-label">Total Messages</div>
+                    <div class="stat-value" id="totalMessages">-</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📝</div>
+                <div class="stat-content">
+                    <div class="stat-label">Messages Today</div>
+                    <div class="stat-value" id="messagesToday">-</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🏢</div>
+                <div class="stat-content">
+                    <div class="stat-label">Chat Rooms</div>
+                    <div class="stat-value" id="totalRooms">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-container">
+            <div class="chart-card">
+                <h3>Sentiment Distribution</h3>
+                <canvas id="sentimentPieChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Daily Sentiment Trends (Last 7 Days)</h3>
+                <canvas id="sentimentLineChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Alerts Section -->
+        <div class="alerts-section">
+            <h3>⚠️ Recent Negative Messages</h3>
+            <div id="negativeAlerts" class="alerts-list">
+                <div class="loading">Loading alerts...</div>
+            </div>
+        </div>
+
+        <!-- User Sentiment Table -->
+        <div class="table-section">
+            <h3>User Sentiment Analysis</h3>
+            <div class="table-container">
+                <table id="userSentimentTable">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Total Messages</th>
+                            <th>Positive</th>
+                            <th>Negative</th>
+                            <th>Neutral</th>
+                            <th>Sentiment Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="6" class="loading">Loading data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>
