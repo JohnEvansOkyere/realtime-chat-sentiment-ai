@@ -1,8 +1,6 @@
 # backend/app/api/websocket.py
 """
-WebSocket endpoint for real-time chat with message persistence.
-Time Complexity: O(n) per message where n is room participants
-Space Complexity: O(1) per connection
+WebSocket endpoint for real-time chat with ML sentiment analysis.
 """
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 import json
@@ -10,6 +8,7 @@ from datetime import datetime
 from ..websocket.manager import manager
 from ..core.security import security_service
 from ..services.chat_service import chat_service
+from ..ml.inference import ml_inference_service
 from ..schemas.message import MessageCreate, MessageType
 
 router = APIRouter(tags=["WebSocket"])
@@ -22,14 +21,7 @@ async def websocket_endpoint(
     token: str = Query(...)
 ):
     """
-    WebSocket endpoint for real-time chat with message persistence.
-    
-    Args:
-        websocket: WebSocket connection
-        room_id: Chat room identifier
-        token: JWT token for authentication
-    
-    Business Value: Real-time communication with persistent storage
+    WebSocket endpoint with real-time sentiment analysis.
     """
     # Verify token
     payload = security_service.decode_token(token)
@@ -43,9 +35,7 @@ async def websocket_endpoint(
         await websocket.close(code=4001, reason="Invalid user")
         return
     
-    # Get username from token or query
-    # In production, fetch from database
-    username = email.split('@')[0]  # Simplified for now
+    username = email.split('@')[0]
     
     # Connect user
     await manager.connect(websocket, user_id)
@@ -66,26 +56,33 @@ async def websocket_endpoint(
     
     try:
         while True:
-            # Receive message from client
+            # Receive message
             data = await websocket.receive_text()
             message_data = json.loads(data)
             
-            # Create message object for persistence
+            # Analyze sentiment using YOUR model
+            sentiment_result = ml_inference_service.analyze_sentiment(
+                message_data.get('content', '')
+            )
+            
+            # Create message object
             message_create = MessageCreate(
                 content=message_data.get('content', ''),
                 chat_room_id=room_id,
                 message_type=MessageType(message_data.get('message_type', 'text'))
             )
             
-            # Save message to database (without ML for now, will add in Day 3)
+            # Save message with sentiment
             try:
                 saved_message = await chat_service.save_message(
                     message_create,
                     user_id,
-                    username
+                    username,
+                    sentiment=sentiment_result['label'],
+                    category=None  # We'll add this later if needed
                 )
                 
-                # Broadcast saved message to room
+                # Broadcast message with sentiment
                 message_response = {
                     "type": "message",
                     "id": saved_message.id,
@@ -96,15 +93,14 @@ async def websocket_endpoint(
                     "room_id": room_id,
                     "timestamp": saved_message.created_at,
                     "sentiment": saved_message.sentiment,
-                    "category": saved_message.category
+                    "sentiment_score": sentiment_result['score']
                 }
                 
                 await manager.broadcast_to_room(message_response, room_id)
                 
-                print(f"Message saved and broadcast in room {room_id}: {saved_message.id}")
+                print(f"✓ Message [{sentiment_result['label']}]: {saved_message.content[:50]}")
                 
             except ValueError as e:
-                # Send error to sender only
                 await manager.send_personal_message(
                     {
                         "type": "error",
@@ -118,7 +114,6 @@ async def websocket_endpoint(
         manager.disconnect(websocket, user_id)
         manager.leave_room(user_id, room_id)
         
-        # Notify room of user leaving
         await manager.broadcast_to_room(
             {
                 "type": "user_left",
@@ -129,9 +124,8 @@ async def websocket_endpoint(
             },
             room_id
         )
-        print(f"User {username} disconnected from room {room_id}")
     
     except Exception as e:
-        print(f"WebSocket error for user {user_id} in room {room_id}: {e}")
+        print(f"WebSocket error: {e}")
         manager.disconnect(websocket, user_id)
         manager.leave_room(user_id, room_id)
