@@ -79,8 +79,19 @@ async def websocket_endpoint(
                     user_id,
                     username,
                     sentiment=sentiment_result['label'],
-                    category=None  # We'll add this later if needed
+                    category=None
                 )
+                
+                # Convert datetime to ISO string for JSON serialization
+                timestamp = saved_message.created_at
+                if isinstance(timestamp, datetime):
+                    timestamp = timestamp.isoformat()
+                elif isinstance(timestamp, str):
+                    # If it's already a string, ensure it's ISO format
+                    try:
+                        timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00')).isoformat()
+                    except:
+                        timestamp = timestamp
                 
                 # Broadcast message with sentiment
                 message_response = {
@@ -91,7 +102,7 @@ async def websocket_endpoint(
                     "sender_username": saved_message.sender_username,
                     "message_type": saved_message.message_type.value,
                     "room_id": room_id,
-                    "timestamp": saved_message.created_at,
+                    "created_at": timestamp,  # Use converted timestamp
                     "sentiment": saved_message.sentiment,
                     "sentiment_score": sentiment_result['score']
                 }

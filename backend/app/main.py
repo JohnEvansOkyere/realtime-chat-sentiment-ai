@@ -4,7 +4,7 @@ Main FastAPI application entry point.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+# from fastapi.staticfiles import StaticFiles  # <-- Comment this out
 from .core.config import settings
 from .api import auth, chat, websocket, analytics
 
@@ -32,7 +32,7 @@ app.include_router(websocket.router, prefix=settings.API_V1_STR)
 app.include_router(analytics.router, prefix=settings.API_V1_STR)
 
 # Serve static files (frontend)
-app.mount("/static", StaticFiles(directory="/app/frontend"), name="static")
+# app.mount("/static", StaticFiles(directory="/app/frontend"), name="static")  # <-- Comment this out
 
 
 @app.get("/")
