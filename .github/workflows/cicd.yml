@@ -1,0 +1,58 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ evans-implementation ]
+  pull_request:
+    branches: [ evans-implementation ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+    
+    - name: Run linting
+      run: |
+        cd backend
+        pip install flake8
+        flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
+    
+    - name: Run tests
+      run: |
+        cd backend
+        pip install pytest pytest-asyncio httpx
+        pytest tests/ -v
+    
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/evans-implementation'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build Docker image
+      run: |
+        docker build -t realtime-chat-ai:${{ github.sha }} ./backend
+    
+    - name: Save Docker image
+      run: |
+        docker save realtime-chat-ai:${{ github.sha }} > image.tar
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: docker-image
+        path: image.tar
