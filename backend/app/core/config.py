@@ -1,4 +1,4 @@
-" backend/app/core/config.py"
+# backend/app/core/config.py
 
 """
 Configuration management using Pydantic Settings.
