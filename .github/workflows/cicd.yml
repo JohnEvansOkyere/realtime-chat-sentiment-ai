@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ evans-implementation ]
+    branches: [ john_evans_okeyre ]
   pull_request:
-    branches: [ evans-implementation ]
+    branches: [ john_evans_okeyre ]
 
 jobs:
   test:
