@@ -371,255 +371,118 @@ class ChatService:
             .execute()
         
         return [p['users'] for p in participants.data]
-    
 
-    # backend/app/services/chat_service.py
-# Add these methods to the ChatService class:
+    async def get_room_details(self, room_id: str) -> Optional[Dict[str, Any]]:
+        """Get basic room details."""
+        result = self.db.table('chat_rooms')\
+            .select('*')\
+            .eq('id', room_id)\
+            .single()\
+            .execute()
+        
+        return result.data if result.data else None
 
-async def get_room_details(self, room_id: str) -> Optional[Dict[str, Any]]:
-    """Get basic room details."""
-    result = self.db.table('chat_rooms')\
-        .select('*')\
-        .eq('id', room_id)\
-        .single()\
-        .execute()
-    
-    return result.data if result.data else None
+    async def get_room_with_creator(self, room_id: str, user_id: str) -> Dict[str, Any]:
+        """Get room details with creator info. Verify user is a participant."""
+        # Verify user is participant
+        participant = self.db.table('chat_participants')\
+            .select('id')\
+            .eq('chat_room_id', room_id)\
+            .eq('user_id', user_id)\
+            .execute()
+        
+        if not participant.data:
+            raise ValueError("User is not a participant of this chat room")
+        
+        # Get room details
+        room = self.db.table('chat_rooms')\
+            .select('*')\
+            .eq('id', room_id)\
+            .single()\
+            .execute()
+        
+        if not room.data:
+            raise ValueError("Chat room not found")
+        
+        # Get creator username
+        creator = self.db.table('users')\
+            .select('username')\
+            .eq('id', room.data['created_by'])\
+            .single()\
+            .execute()
+        
+        # Get participants
+        participants = await self.get_room_participants(room_id)
+        
+        return {
+            **room.data,
+            'creator_username': creator.data['username'] if creator.data else 'Unknown',
+            'participants': participants
+        }
 
+    async def add_participant(self, room_id: str, user_id: str):
+        """Add a participant to a chat room."""
+        user = self.db.table('users')\
+            .select('id')\
+            .eq('id', user_id)\
+            .single()\
+            .execute()
+        
+        if not user.data:
+            raise ValueError("User not found")
+        
+        existing = self.db.table('chat_participants')\
+            .select('id')\
+            .eq('chat_room_id', room_id)\
+            .eq('user_id', user_id)\
+            .execute()
+        
+        if existing.data:
+            raise ValueError("User is already a participant")
+        
+        self.db.table('chat_participants').insert({
+            'chat_room_id': room_id,
+            'user_id': user_id,
+            'joined_at': datetime.utcnow().isoformat()
+        }).execute()
 
-async def get_room_with_creator(self, room_id: str, user_id: str) -> Dict[str, Any]:
-    """
-    Get room details with creator info.
-    Verify user is a participant.
-    """
-    # Verify user is participant
-    participant = self.db.table('chat_participants')\
-        .select('id')\
-        .eq('chat_room_id', room_id)\
-        .eq('user_id', user_id)\
-        .execute()
-    
-    if not participant.data:
-        raise ValueError("User is not a participant of this chat room")
-    
-    # Get room details
-    room = self.db.table('chat_rooms')\
-        .select('*')\
-        .eq('id', room_id)\
-        .single()\
-        .execute()
-    
-    if not room.data:
-        raise ValueError("Chat room not found")
-    
-    # Get creator username
-    creator = self.db.table('users')\
-        .select('username')\
-        .eq('id', room.data['created_by'])\
-        .single()\
-        .execute()
-    
-    # Get participants
-    participants = await self.get_room_participants(room_id)
-    
-    return {
-        **room.data,
-        'creator_username': creator.data['username'] if creator.data else 'Unknown',
-        'participants': participants
-    }
+    async def remove_participant(self, room_id: str, user_id: str):
+        """Remove a participant from a chat room."""
+        result = self.db.table('chat_participants')\
+            .delete()\
+            .eq('chat_room_id', room_id)\
+            .eq('user_id', user_id)\
+            .execute()
+        
+        if not result.data:
+            raise ValueError("Participant not found")
 
+    async def update_room_name(self, room_id: str, name: str) -> ChatRoomResponse:
+        """Update room name."""
+        result = self.db.table('chat_rooms')\
+            .update({'name': name})\
+            .eq('id', room_id)\
+            .execute()
+        
+        if not result.data:
+            raise ValueError("Failed to update room")
+        
+        room = result.data[0]
+        
+        participants = self.db.table('chat_participants')\
+            .select('id', count='exact')\
+            .eq('chat_room_id', room_id)\
+            .execute()
+        
+        return ChatRoomResponse(
+            id=room['id'],
+            name=room['name'],
+            is_group=room['is_group'],
+            created_by=room['created_by'],
+            created_at=room['created_at'],
+            participants_count=participants.count
+        )
 
-async def add_participant(self, room_id: str, user_id: str):
-    """Add a participant to a chat room."""
-    # Check if user exists
-    user = self.db.table('users')\
-        .select('id')\
-        .eq('id', user_id)\
-        .single()\
-        .execute()
-    
-    if not user.data:
-        raise ValueError("User not found")
-    
-    # Check if already a participant
-    existing = self.db.table('chat_participants')\
-        .select('id')\
-        .eq('chat_room_id', room_id)\
-        .eq('user_id', user_id)\
-        .execute()
-    
-    if existing.data:
-        raise ValueError("User is already a participant")
-    
-    # Add participant
-    self.db.table('chat_participants').insert({
-        'chat_room_id': room_id,
-        'user_id': user_id,
-        'joined_at': datetime.utcnow().isoformat()
-    }).execute()
-
-
-async def remove_participant(self, room_id: str, user_id: str):
-    """Remove a participant from a chat room."""
-    result = self.db.table('chat_participants')\
-        .delete()\
-        .eq('chat_room_id', room_id)\
-        .eq('user_id', user_id)\
-        .execute()
-    
-    if not result.data:
-        raise ValueError("Participant not found")
-
-
-async def update_room_name(self, room_id: str, name: str) -> ChatRoomResponse:
-    """Update room name."""
-    result = self.db.table('chat_rooms')\
-        .update({'name': name})\
-        .eq('id', room_id)\
-        .execute()
-    
-    if not result.data:
-        raise ValueError("Failed to update room")
-    
-    room = result.data[0]
-    
-    # Get participant count
-    participants = self.db.table('chat_participants')\
-        .select('id', count='exact')\
-        .eq('chat_room_id', room_id)\
-        .execute()
-    
-    return ChatRoomResponse(
-        id=room['id'],
-        name=room['name'],
-        is_group=room['is_group'],
-        created_by=room['created_by'],
-        created_at=room['created_at'],
-        participants_count=participants.count
-    )
-
-
-async def get_room_details(self, room_id: str) -> Optional[Dict[str, Any]]:
-    """Get basic room details."""
-    result = self.db.table('chat_rooms')\
-        .select('*')\
-        .eq('id', room_id)\
-        .single()\
-        .execute()
-    
-    return result.data if result.data else None
-
-
-async def get_room_with_creator(self, room_id: str, user_id: str) -> Dict[str, Any]:
-    """
-    Get room details with creator info.
-    Verify user is a participant.
-    """
-    # Verify user is participant
-    participant = self.db.table('chat_participants')\
-        .select('id')\
-        .eq('chat_room_id', room_id)\
-        .eq('user_id', user_id)\
-        .execute()
-    
-    if not participant.data:
-        raise ValueError("User is not a participant of this chat room")
-    
-    # Get room details
-    room = self.db.table('chat_rooms')\
-        .select('*')\
-        .eq('id', room_id)\
-        .single()\
-        .execute()
-    
-    if not room.data:
-        raise ValueError("Chat room not found")
-    
-    # Get creator username
-    creator = self.db.table('users')\
-        .select('username')\
-        .eq('id', room.data['created_by'])\
-        .single()\
-        .execute()
-    
-    # Get participants
-    participants = await self.get_room_participants(room_id)
-    
-    return {
-        **room.data,
-        'creator_username': creator.data['username'] if creator.data else 'Unknown',
-        'participants': participants
-    }
-
-
-async def add_participant(self, room_id: str, user_id: str):
-    """Add a participant to a chat room."""
-    # Check if user exists
-    user = self.db.table('users')\
-        .select('id')\
-        .eq('id', user_id)\
-        .single()\
-        .execute()
-    
-    if not user.data:
-        raise ValueError("User not found")
-    
-    # Check if already a participant
-    existing = self.db.table('chat_participants')\
-        .select('id')\
-        .eq('chat_room_id', room_id)\
-        .eq('user_id', user_id)\
-        .execute()
-    
-    if existing.data:
-        raise ValueError("User is already a participant")
-    
-    # Add participant
-    self.db.table('chat_participants').insert({
-        'chat_room_id': room_id,
-        'user_id': user_id,
-        'joined_at': datetime.utcnow().isoformat()
-    }).execute()
-
-
-async def remove_participant(self, room_id: str, user_id: str):
-    """Remove a participant from a chat room."""
-    result = self.db.table('chat_participants')\
-        .delete()\
-        .eq('chat_room_id', room_id)\
-        .eq('user_id', user_id)\
-        .execute()
-    
-    if not result.data:
-        raise ValueError("Participant not found")
-
-
-async def update_room_name(self, room_id: str, name: str) -> ChatRoomResponse:
-    """Update room name."""
-    result = self.db.table('chat_rooms')\
-        .update({'name': name})\
-        .eq('id', room_id)\
-        .execute()
-    
-    if not result.data:
-        raise ValueError("Failed to update room")
-    
-    room = result.data[0]
-    
-    # Get participant count
-    participants = self.db.table('chat_participants')\
-        .select('id', count='exact')\
-        .eq('chat_room_id', room_id)\
-        .execute()
-    
-    return ChatRoomResponse(
-        id=room['id'],
-        name=room['name'],
-        is_group=room['is_group'],
-        created_by=room['created_by'],
-        created_at=room['created_at'],
-        participants_count=participants.count
-    )
 
 # Singleton instance
 chat_service = ChatService()

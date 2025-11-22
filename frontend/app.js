@@ -335,16 +335,31 @@ const app = {
     },
 
     updateGroupManagementUI() {
+        console.log('=== DEBUG: updateGroupManagementUI called ===');
+        console.log('currentRoomDetails:', this.currentRoomDetails);
+        console.log('currentUser:', this.currentUser);
+        
         const chatHeader = document.querySelector('.chat-header');
+        console.log('chatHeader found:', !!chatHeader);
         
         // Remove existing management button if any
         const existingBtn = document.getElementById('manageGroupBtn');
         if (existingBtn) existingBtn.remove();
         
+        // Check conditions
+        if (this.currentRoomDetails) {
+            console.log('Room is_group:', this.currentRoomDetails.is_group);
+            console.log('Room created_by:', this.currentRoomDetails.created_by);
+            console.log('Current user ID:', this.currentUser.id);
+            console.log('User is creator:', this.currentRoomDetails.created_by === this.currentUser.id);
+        }
+        
         // Only show for group chats where current user is creator
         if (this.currentRoomDetails && 
             this.currentRoomDetails.is_group && 
             this.currentRoomDetails.created_by === this.currentUser.id) {
+            
+            console.log('✓ Creating manage button!');
             
             const manageBtn = document.createElement('button');
             manageBtn.id = 'manageGroupBtn';
@@ -353,9 +368,11 @@ const app = {
             manageBtn.onclick = () => this.showGroupManagementModal();
             
             chatHeader.appendChild(manageBtn);
+            console.log('✓ Button added to DOM');
+        } else {
+            console.log('✗ Conditions not met - button not created');
         }
     },
-
     showGroupManagementModal() {
         document.getElementById('groupManagementModal').classList.add('active');
         
