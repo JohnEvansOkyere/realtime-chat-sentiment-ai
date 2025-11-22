@@ -1,10 +1,11 @@
-name: CI/CD Pipeline
+# .github/workflows/tests.yml
+name: Tests
 
 on:
   push:
-    branches: [ john_evans_okeyre ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ john_evans_okeyre ]
+    branches: [ main, develop ]
 
 jobs:
   test:
@@ -21,38 +22,16 @@ jobs:
     - name: Install dependencies
       run: |
         cd backend
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
-    
-    - name: Run linting
-      run: |
-        cd backend
-        pip install flake8
-        flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
     
     - name: Run tests
       run: |
         cd backend
-        pip install pytest pytest-asyncio httpx
-        pytest tests/ -v
+        pytest tests/ -v --cov=app --cov-report=xml
     
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/evans-implementation'
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Build Docker image
-      run: |
-        docker build -t realtime-chat-ai:${{ github.sha }} ./backend
-    
-    - name: Save Docker image
-      run: |
-        docker save realtime-chat-ai:${{ github.sha }} > image.tar
-    
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
       with:
-        name: docker-image
-        path: image.tar
+        file: ./backend/coverage.xml
+        fail_ci_if_error: true
