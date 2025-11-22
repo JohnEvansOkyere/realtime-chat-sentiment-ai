@@ -1,25 +1,38 @@
 // frontend/admin.js
 const API_URL = 'http://localhost:8000/api/v1';
-let accessToken = localStorage.getItem('accessToken');
 
 const adminDashboard = {
     charts: {},
+    accessToken: null,
+    currentUser: null,
 
     async init() {
-        // Get token from localStorage (set by main app)
-        if (!accessToken) {
-            alert('Please login first');
-            window.location.href = 'index.html';
-            return;
-        }
-
-         if (currentUser && !currentUser.is_admin) {
-            alert('Admin access required');
-            window.location.href = 'index.html';
-            return;
-        }
-
+        // Get token from localStorage
+        this.accessToken = localStorage.getItem('accessToken');
         
+        if (!this.accessToken) {
+            alert('Please login first');
+            window.close();
+            return;
+        }
+
+        // Get user from localStorage
+        try {
+            const userStr = localStorage.getItem('currentUser');
+            if (userStr) {
+                this.currentUser = JSON.parse(userStr);
+            }
+        } catch (e) {
+            console.error('Failed to parse user data:', e);
+        }
+
+        // Check if user is admin
+        if (this.currentUser && !this.currentUser.is_admin) {
+            alert('Admin access required');
+            window.close();
+            return;
+        }
+
         await this.loadAllData();
         
         // Refresh every 30 seconds
@@ -38,7 +51,7 @@ const adminDashboard = {
     async loadOverallStats() {
         try {
             const response = await fetch(`${API_URL}/analytics/stats/overall`, {
-                headers: {'Authorization': `Bearer ${accessToken}`}
+                headers: {'Authorization': `Bearer ${this.accessToken}`}
             });
 
             if (response.ok) {
@@ -47,6 +60,8 @@ const adminDashboard = {
                 document.getElementById('totalMessages').textContent = data.total_messages;
                 document.getElementById('messagesToday').textContent = data.messages_today;
                 document.getElementById('totalRooms').textContent = data.total_chat_rooms;
+            } else {
+                console.error('Failed to load stats:', response.status);
             }
         } catch (error) {
             console.error('Failed to load overall stats:', error);
@@ -56,13 +71,15 @@ const adminDashboard = {
     async loadSentimentOverview() {
         try {
             const response = await fetch(`${API_URL}/analytics/sentiment/overview?days=7`, {
-                headers: {'Authorization': `Bearer ${accessToken}`}
+                headers: {'Authorization': `Bearer ${this.accessToken}`}
             });
 
             if (response.ok) {
                 const data = await response.json();
                 this.renderSentimentPieChart(data.sentiment_distribution);
                 this.renderSentimentLineChart(data.daily_trends);
+            } else {
+                console.error('Failed to load sentiment overview:', response.status);
             }
         } catch (error) {
             console.error('Failed to load sentiment overview:', error);
@@ -74,6 +91,15 @@ const adminDashboard = {
         
         if (this.charts.pie) {
             this.charts.pie.destroy();
+        }
+
+        // Check if we have data
+        if (!distribution || Object.keys(distribution).length === 0) {
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#999';
+            ctx.textAlign = 'center';
+            ctx.fillText('No data available', ctx.canvas.width / 2, ctx.canvas.height / 2);
+            return;
         }
 
         const data = {
@@ -109,6 +135,15 @@ const adminDashboard = {
         
         if (this.charts.line) {
             this.charts.line.destroy();
+        }
+
+        // Check if we have data
+        if (!trends || trends.length === 0) {
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#999';
+            ctx.textAlign = 'center';
+            ctx.fillText('No data available', ctx.canvas.width / 2, ctx.canvas.height / 2);
+            return;
         }
 
         const labels = trends.map(t => new Date(t.date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'}));
@@ -166,15 +201,19 @@ const adminDashboard = {
     async loadNegativeAlerts() {
         try {
             const response = await fetch(`${API_URL}/analytics/sentiment/negative-alerts?limit=10`, {
-                headers: {'Authorization': `Bearer ${accessToken}`}
+                headers: {'Authorization': `Bearer ${this.accessToken}`}
             });
 
             if (response.ok) {
                 const data = await response.json();
                 this.renderNegativeAlerts(data.negative_messages);
+            } else {
+                console.error('Failed to load alerts:', response.status);
+                document.getElementById('negativeAlerts').innerHTML = '<div class="no-data">Failed to load alerts</div>';
             }
         } catch (error) {
             console.error('Failed to load negative alerts:', error);
+            document.getElementById('negativeAlerts').innerHTML = '<div class="no-data">Error loading alerts</div>';
         }
     },
 
@@ -189,10 +228,10 @@ const adminDashboard = {
         container.innerHTML = alerts.map(alert => `
             <div class="alert-item">
                 <div class="alert-header">
-                    <span class="alert-user">@${alert.sender}</span>
+                    <span class="alert-user">@${this.escapeHtml(alert.sender)}</span>
                     <span class="alert-time">${new Date(alert.timestamp).toLocaleString()}</span>
                 </div>
-                <div class="alert-room">💬 ${alert.chat_room}</div>
+                <div class="alert-room">💬 ${this.escapeHtml(alert.chat_room)}</div>
                 <div class="alert-content">${this.escapeHtml(alert.content)}</div>
             </div>
         `).join('');
@@ -201,15 +240,21 @@ const adminDashboard = {
     async loadUserSentiments() {
         try {
             const response = await fetch(`${API_URL}/analytics/sentiment/by-user?days=7`, {
-                headers: {'Authorization': `Bearer ${accessToken}`}
+                headers: {'Authorization': `Bearer ${this.accessToken}`}
             });
 
             if (response.ok) {
                 const data = await response.json();
                 this.renderUserSentimentTable(data.user_sentiments);
+            } else {
+                console.error('Failed to load user sentiments:', response.status);
+                document.querySelector('#userSentimentTable tbody').innerHTML = 
+                    '<tr><td colspan="6" class="no-data">Failed to load data</td></tr>';
             }
         } catch (error) {
             console.error('Failed to load user sentiments:', error);
+            document.querySelector('#userSentimentTable tbody').innerHTML = 
+                '<tr><td colspan="6" class="no-data">Error loading data</td></tr>';
         }
     },
 
@@ -227,7 +272,7 @@ const adminDashboard = {
             
             return `
                 <tr>
-                    <td><strong>${user.username}</strong></td>
+                    <td><strong>${this.escapeHtml(user.username)}</strong></td>
                     <td>${user.total_messages}</td>
                     <td style="color: #28a745">${user.positive_count} (${user.positive_percent}%)</td>
                     <td style="color: #dc3545">${user.negative_count} (${user.negative_percent}%)</td>
@@ -244,14 +289,6 @@ const adminDashboard = {
         return div.innerHTML;
     }
 };
-
-// Store token in localStorage from main app
-window.addEventListener('message', (event) => {
-    if (event.data.type === 'AUTH_TOKEN') {
-        accessToken = event.data.token;
-        localStorage.setItem('accessToken', accessToken);
-    }
-});
 
 // Initialize dashboard
 adminDashboard.init();
