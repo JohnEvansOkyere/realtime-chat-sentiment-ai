@@ -16,8 +16,11 @@ router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 async def get_admin_user(current_user: UserResponse = Depends(get_current_active_user)):
     """Verify user is admin."""
-    # For now, all users can access analytics
-    # In production, check if user.is_admin == True
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
     return current_user
 
 

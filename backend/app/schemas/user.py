@@ -32,6 +32,7 @@ class UserResponse(UserBase):
     """Schema for user response (no password)."""
     id: str
     is_active: bool
+    is_admin: bool = False 
     created_at: datetime
     
     class Config:

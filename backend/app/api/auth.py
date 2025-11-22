@@ -13,20 +13,33 @@ from .dependencies import get_current_active_user
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate):
+@router.post("/register-admin", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register_admin(
+    user_data: UserCreate,
+    admin_secret: str  # Pass a secret key to verify
+):
     """
-    Register a new user.
+    Register a new admin user (requires admin secret).
+    Only use this for initial admin setup!
+    """
+    from ..core.config import settings
     
-    Business Value: Enables user onboarding for the chat platform
-    """
-    try:
-        return await auth_service.register_user(user_data)
-    except ValueError as e:
+    # Check admin secret (set in .env: ADMIN_SECRET_KEY=your-secret)
+    if admin_secret != "your-super-secret-admin-key":  # Use settings.ADMIN_SECRET_KEY in production
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid admin secret"
         )
+    
+    # Create admin user (modify auth_service.register_user to accept is_admin param)
+    # For now, create normally then update
+    result = await auth_service.register_user(user_data)
+    
+    # Update to admin
+    db = db_service.get_admin_client()
+    db.table('users').update({'is_admin': True}).eq('id', result.user.id).execute()
+    
+    return result
 
 
 @router.post("/login", response_model=TokenResponse)

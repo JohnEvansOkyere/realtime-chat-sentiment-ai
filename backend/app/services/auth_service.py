@@ -54,6 +54,7 @@ class AuthenticationService:
             'full_name': user_data.full_name,
             'hashed_password': hashed_password,
             'is_active': True,
+            'is_admin': False, 
             'created_at': datetime.utcnow().isoformat()
         }
         

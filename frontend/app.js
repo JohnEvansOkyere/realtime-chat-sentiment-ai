@@ -4,9 +4,51 @@ const API_URL = 'http://localhost:8000/api/v1';
 const app = {
     currentUser: null,
     accessToken: null,
+    refreshToken: null,
     ws: null,
     currentRoomId: null,
     userChats: [],
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 5,
+
+    // Initialize app
+    init() {
+        console.log('🚀 Realtime Chat AI loaded');
+        this.checkExistingSession();
+        this.setupEventListeners();
+    },
+
+    // Check for existing session on page load
+    checkExistingSession() {
+        const token = localStorage.getItem('accessToken');
+        const userStr = localStorage.getItem('currentUser');
+        
+        if (token && userStr) {
+            try {
+                this.accessToken = token;
+                this.refreshToken = localStorage.getItem('refreshToken');
+                this.currentUser = JSON.parse(userStr);
+                this.showChatInterface();
+            } catch (error) {
+                console.error('Failed to restore session:', error);
+                this.clearSession();
+            }
+        }
+    },
+
+    // Setup event listeners (only once)
+    setupEventListeners() {
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput && !messageInput.dataset.listenerAdded) {
+            messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendMessage();
+                }
+            });
+            messageInput.dataset.listenerAdded = 'true';
+        }
+    },
 
     // Auth Functions
     showRegister() {
@@ -25,6 +67,11 @@ const app = {
         const errorDiv = document.getElementById('authError');
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
+        
+        // Auto-hide error after 5 seconds
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 5000);
     },
 
     async register() {
@@ -53,8 +100,7 @@ const app = {
             const data = await response.json();
 
             if (response.ok) {
-                this.accessToken = data.access_token;
-                this.currentUser = data.user;
+                this.saveSession(data);
                 this.showChatInterface();
             } else {
                 this.showError(data.detail || 'Registration failed');
@@ -84,8 +130,7 @@ const app = {
             const data = await response.json();
 
             if (response.ok) {
-                this.accessToken = data.access_token;
-                this.currentUser = data.user;
+                this.saveSession(data);
                 this.showChatInterface();
             } else {
                 this.showError(data.detail || 'Login failed');
@@ -96,30 +141,122 @@ const app = {
         }
     },
 
+    saveSession(data) {
+        this.accessToken = data.access_token;
+        this.refreshToken = data.refresh_token;
+        this.currentUser = data.user;
+        
+        localStorage.setItem('accessToken', data.access_token);
+        localStorage.setItem('refreshToken', data.refresh_token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+    },
+
+    clearSession() {
+        this.accessToken = null;
+        this.refreshToken = null;
+        this.currentUser = null;
+        
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('currentUser');
+    },
+
+    logout() {
+        // Close WebSocket
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
+        }
+        
+        // Clear session
+        this.clearSession();
+        
+        // Reset UI
+        this.currentRoomId = null;
+        this.userChats = [];
+        
+        // Show auth screen
+        document.getElementById('chatContainer').style.display = 'none';
+        document.getElementById('authContainer').style.display = 'flex';
+        this.showLogin();
+        
+        console.log('Logged out successfully');
+    },
+
     showChatInterface() {
         document.getElementById('authContainer').style.display = 'none';
         document.getElementById('chatContainer').style.display = 'flex';
+        
+        const adminBadge = this.currentUser.is_admin ? 
+            '<span style="background: #28a745; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px;">ADMIN</span>' : '';
+        
         document.getElementById('userInfo').innerHTML = `
-            Logged in as <strong>${this.currentUser.username}</strong><br>
+            Logged in as <strong>${this.currentUser.username}</strong>${adminBadge}<br>
             <small>ID: ${this.currentUser.id}</small>
         `;
-        this.loadUserChats();
         
-        // Enable Enter key for sending messages
-        document.getElementById('messageInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.sendMessage();
+        // Show/hide analytics button based on admin status
+        const adminButton = document.querySelector('.admin-link-btn');
+        if (adminButton) {
+            adminButton.style.display = this.currentUser.is_admin ? 'block' : 'none';
+        }
+        
+        this.loadUserChats();
+        this.setupEventListeners();
+    },
+
+    // API call wrapper with token refresh
+    async fetchWithAuth(url, options = {}) {
+        options.headers = {
+            ...options.headers,
+            'Authorization': `Bearer ${this.accessToken}`
+        };
+
+        let response = await fetch(url, options);
+
+        // If unauthorized, try to refresh token
+        if (response.status === 401) {
+            const refreshed = await this.refreshAccessToken();
+            if (refreshed) {
+                // Retry with new token
+                options.headers['Authorization'] = `Bearer ${this.accessToken}`;
+                response = await fetch(url, options);
+            } else {
+                // Refresh failed, logout
+                this.logout();
+                throw new Error('Session expired. Please login again.');
             }
-        });
+        }
+
+        return response;
+    },
+
+    async refreshAccessToken() {
+        if (!this.refreshToken) return false;
+
+        try {
+            const response = await fetch(`${API_URL}/auth/refresh`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({refresh_token: this.refreshToken})
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.saveSession(data);
+                return true;
+            }
+        } catch (error) {
+            console.error('Token refresh failed:', error);
+        }
+        
+        return false;
     },
 
     // Chat Functions
     async loadUserChats() {
         try {
-            const response = await fetch(`${API_URL}/chat/rooms`, {
-                headers: {'Authorization': `Bearer ${this.accessToken}`}
-            });
+            const response = await this.fetchWithAuth(`${API_URL}/chat/rooms`);
 
             if (response.ok) {
                 this.userChats = await response.json();
@@ -146,11 +283,11 @@ const app = {
             chatItem.onclick = () => this.selectChat(chat.id, chatItem);
             
             const lastMsg = chat.last_message ? 
-                chat.last_message.content.substring(0, 50) : 
+                this.escapeHtml(chat.last_message.content.substring(0, 50)) : 
                 'No messages yet';
             
             chatItem.innerHTML = `
-                <div class="chat-name">${chat.name || 'Unnamed Chat'}</div>
+                <div class="chat-name">${this.escapeHtml(chat.name || 'Unnamed Chat')}</div>
                 <div class="chat-preview">${lastMsg}</div>
             `;
             
@@ -168,7 +305,7 @@ const app = {
         chatElement.classList.add('active');
 
         const chat = this.userChats.find(c => c.id === roomId);
-        document.getElementById('chatTitle').textContent = chat.name || 'Chat';
+        document.getElementById('chatTitle').textContent = this.escapeHtml(chat.name || 'Chat');
         document.getElementById('messageInput').disabled = false;
         document.getElementById('sendBtn').disabled = false;
 
@@ -181,9 +318,9 @@ const app = {
 
     async loadChatHistory(roomId) {
         try {
-            const response = await fetch(`${API_URL}/chat/rooms/${roomId}/messages?limit=50`, {
-                headers: {'Authorization': `Bearer ${this.accessToken}`}
-            });
+            const response = await this.fetchWithAuth(
+                `${API_URL}/chat/rooms/${roomId}/messages?limit=50`
+            );
 
             if (response.ok) {
                 const messages = await response.json();
@@ -220,19 +357,16 @@ const app = {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${message.sender_id === this.currentUser.id ? 'own' : ''}`;
 
-        const time = new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        
-        const sentimentBadge = message.sentiment ? 
-            `<span class="sentiment-badge sentiment-${message.sentiment}">${message.sentiment}</span>` : '';
+        const timestamp = message.created_at || message.timestamp;
+        const time = new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
         messageDiv.innerHTML = `
             <div class="message-content">
                 ${message.sender_id !== this.currentUser.id ? 
-                    `<div class="message-sender">${message.sender_username}</div>` : ''}
+                    `<div class="message-sender">${this.escapeHtml(message.sender_username)}</div>` : ''}
                 <div class="message-text">${this.escapeHtml(message.content)}</div>
                 <div class="message-footer">
                     <span class="message-time">${time}</span>
-                    ${sentimentBadge}
                 </div>
             </div>
         `;
@@ -242,6 +376,7 @@ const app = {
     },
 
     connectWebSocket(roomId) {
+        // Close existing connection
         if (this.ws) {
             this.ws.close();
         }
@@ -252,6 +387,7 @@ const app = {
         this.ws.onopen = () => {
             document.getElementById('chatStatus').textContent = '● Connected';
             console.log('✓ WebSocket connected');
+            this.reconnectAttempts = 0; // Reset on successful connection
         };
 
         this.ws.onmessage = (event) => {
@@ -264,7 +400,8 @@ const app = {
             } else if (data.type === 'user_left') {
                 this.addSystemMessage(`${data.username} left the chat`);
             } else if (data.type === 'error') {
-                alert('Error: ' + data.message);
+                console.error('WebSocket error:', data.message);
+                this.showError(data.message);
             }
         };
 
@@ -273,9 +410,20 @@ const app = {
             document.getElementById('chatStatus').textContent = '● Connection error';
         };
 
-        this.ws.onclose = () => {
+        this.ws.onclose = (event) => {
             document.getElementById('chatStatus').textContent = '● Disconnected';
             console.log('WebSocket disconnected');
+            
+            // Auto-reconnect if it was an abnormal closure
+            if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+                this.reconnectAttempts++;
+                console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+                setTimeout(() => {
+                    if (this.currentRoomId) {
+                        this.connectWebSocket(this.currentRoomId);
+                    }
+                }, 2000 * this.reconnectAttempts); // Exponential backoff
+            }
         };
     },
 
@@ -292,7 +440,12 @@ const app = {
         const input = document.getElementById('messageInput');
         const content = input.value.trim();
 
-        if (!content || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        if (!content) {
+            return;
+        }
+
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            this.showError('Not connected. Please wait...');
             return;
         }
 
@@ -336,12 +489,9 @@ const app = {
         const isGroup = chatType === 'group';
 
         try {
-            const response = await fetch(`${API_URL}/chat/rooms`, {
+            const response = await this.fetchWithAuth(`${API_URL}/chat/rooms`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.accessToken}`
-                },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     name: isGroup ? groupName : null,
                     is_group: isGroup,
@@ -375,5 +525,9 @@ const app = {
     }
 };
 
-// Initialize
-console.log('🚀 Realtime Chat AI loaded');
+// Initialize app when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => app.init());
+} else {
+    app.init();
+}

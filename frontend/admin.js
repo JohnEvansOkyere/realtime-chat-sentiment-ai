@@ -9,10 +9,17 @@ const adminDashboard = {
         // Get token from localStorage (set by main app)
         if (!accessToken) {
             alert('Please login first');
-            window.close();
+            window.location.href = 'index.html';
             return;
         }
 
+         if (currentUser && !currentUser.is_admin) {
+            alert('Admin access required');
+            window.location.href = 'index.html';
+            return;
+        }
+
+        
         await this.loadAllData();
         
         // Refresh every 30 seconds
