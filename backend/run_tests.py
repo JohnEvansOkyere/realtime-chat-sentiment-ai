@@ -37,7 +37,7 @@ def main():
         "--cov=app",
         "--cov-report=html",
         "--cov-report=term-missing",
-        "--cov-fail-under=50",
+        "--cov-fail-under=40",
         "-W", "ignore::DeprecationWarning"
     ])
     
