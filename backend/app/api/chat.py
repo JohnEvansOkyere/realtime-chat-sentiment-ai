@@ -108,3 +108,161 @@ async def send_message(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    
+# backend/app/api/chat.py
+# Add these new endpoints:
+
+@router.post("/rooms/{room_id}/participants", status_code=status.HTTP_201_CREATED)
+async def add_participant_to_room(
+    room_id: str,
+    user_id: str = Query(..., description="User ID to add"),
+    current_user: UserResponse = Depends(get_current_active_user)
+):
+    """
+    Add a participant to a group chat.
+    Only group creator can add participants.
+    
+    Business Value: Dynamic team management
+    """
+    try:
+        # Check if room exists and is a group
+        room = await chat_service.get_room_details(room_id)
+        if not room:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Chat room not found"
+            )
+        
+        if not room['is_group']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Can only add participants to group chats"
+            )
+        
+        # Check if current user is the creator
+        if room['created_by'] != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only group creator can add participants"
+            )
+        
+        # Add participant
+        await chat_service.add_participant(room_id, user_id)
+        
+        return {"message": "Participant added successfully"}
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.delete("/rooms/{room_id}/participants/{user_id}", status_code=status.HTTP_200_OK)
+async def remove_participant_from_room(
+    room_id: str,
+    user_id: str,
+    current_user: UserResponse = Depends(get_current_active_user)
+):
+    """
+    Remove a participant from a group chat.
+    Only group creator can remove participants.
+    
+    Business Value: Group moderation
+    """
+    try:
+        # Check if room exists and is a group
+        room = await chat_service.get_room_details(room_id)
+        if not room:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Chat room not found"
+            )
+        
+        if not room['is_group']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Can only remove participants from group chats"
+            )
+        
+        # Check if current user is the creator
+        if room['created_by'] != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only group creator can remove participants"
+            )
+        
+        # Cannot remove creator
+        if user_id == room['created_by']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot remove group creator"
+            )
+        
+        # Remove participant
+        await chat_service.remove_participant(room_id, user_id)
+        
+        return {"message": "Participant removed successfully"}
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.put("/rooms/{room_id}", response_model=ChatRoomResponse)
+async def update_room(
+    room_id: str,
+    name: str = Query(..., min_length=1, max_length=100),
+    current_user: UserResponse = Depends(get_current_active_user)
+):
+    """
+    Update group chat name.
+    Only group creator can update.
+    
+    Business Value: Keep group names relevant
+    """
+    try:
+        room = await chat_service.get_room_details(room_id)
+        if not room:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Chat room not found"
+            )
+        
+        # Check if current user is the creator
+        if room['created_by'] != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only group creator can update room"
+            )
+        
+        updated_room = await chat_service.update_room_name(room_id, name)
+        return updated_room
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.get("/rooms/{room_id}")
+async def get_room_details(
+    room_id: str,
+    current_user: UserResponse = Depends(get_current_active_user)
+):
+    """
+    Get room details including creator info.
+    
+    Business Value: Know who manages the group
+    """
+    try:
+        room = await chat_service.get_room_with_creator(room_id, current_user.id)
+        return room
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )

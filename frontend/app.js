@@ -7,6 +7,7 @@ const app = {
     refreshToken: null,
     ws: null,
     currentRoomId: null,
+    currentRoomDetails: null,
     userChats: [],
     reconnectAttempts: 0,
     maxReconnectAttempts: 5,
@@ -173,6 +174,7 @@ const app = {
         
         // Reset UI
         this.currentRoomId = null;
+        this.currentRoomDetails = null;
         this.userChats = [];
         
         // Show auth screen
@@ -304,6 +306,9 @@ const app = {
         });
         chatElement.classList.add('active');
 
+        // Load room details to check if user is admin
+        await this.loadRoomDetails(roomId);
+
         const chat = this.userChats.find(c => c.id === roomId);
         document.getElementById('chatTitle').textContent = this.escapeHtml(chat.name || 'Chat');
         document.getElementById('messageInput').disabled = false;
@@ -314,6 +319,161 @@ const app = {
 
         // Connect WebSocket
         this.connectWebSocket(roomId);
+    },
+
+    async loadRoomDetails(roomId) {
+        try {
+            const response = await this.fetchWithAuth(`${API_URL}/chat/rooms/${roomId}`);
+            
+            if (response.ok) {
+                this.currentRoomDetails = await response.json();
+                this.updateGroupManagementUI();
+            }
+        } catch (error) {
+            console.error('Failed to load room details:', error);
+        }
+    },
+
+    updateGroupManagementUI() {
+        const chatHeader = document.querySelector('.chat-header');
+        
+        // Remove existing management button if any
+        const existingBtn = document.getElementById('manageGroupBtn');
+        if (existingBtn) existingBtn.remove();
+        
+        // Only show for group chats where current user is creator
+        if (this.currentRoomDetails && 
+            this.currentRoomDetails.is_group && 
+            this.currentRoomDetails.created_by === this.currentUser.id) {
+            
+            const manageBtn = document.createElement('button');
+            manageBtn.id = 'manageGroupBtn';
+            manageBtn.className = 'manage-group-btn';
+            manageBtn.textContent = '⚙️ Manage Group';
+            manageBtn.onclick = () => this.showGroupManagementModal();
+            
+            chatHeader.appendChild(manageBtn);
+        }
+    },
+
+    showGroupManagementModal() {
+        document.getElementById('groupManagementModal').classList.add('active');
+        
+        // Pre-fill group name
+        if (this.currentRoomDetails && this.currentRoomDetails.name) {
+            document.getElementById('editGroupName').value = this.currentRoomDetails.name;
+        }
+        
+        this.loadGroupParticipants();
+    },
+
+    closeGroupManagementModal() {
+        document.getElementById('groupManagementModal').classList.remove('active');
+        document.getElementById('addParticipantId').value = '';
+    },
+
+    async loadGroupParticipants() {
+        const container = document.getElementById('participantsList');
+        container.innerHTML = '<div class="loading">Loading participants...</div>';
+        
+        if (!this.currentRoomDetails || !this.currentRoomDetails.participants) {
+            return;
+        }
+        
+        const participants = this.currentRoomDetails.participants;
+        const creatorId = this.currentRoomDetails.created_by;
+        
+        container.innerHTML = participants.map(p => `
+            <div class="participant-item">
+                <div class="participant-info">
+                    <strong>${this.escapeHtml(p.username)}</strong>
+                    ${p.id === creatorId ? '<span class="creator-badge">Admin</span>' : ''}
+                </div>
+                ${p.id !== creatorId ? 
+                    `<button class="remove-participant-btn" onclick="app.removeParticipant('${p.id}')">Remove</button>` 
+                    : ''}
+            </div>
+        `).join('');
+    },
+
+    async addParticipantToGroup() {
+        const userId = document.getElementById('addParticipantId').value.trim();
+        
+        if (!userId) {
+            alert('Please enter user ID');
+            return;
+        }
+        
+        try {
+            const response = await this.fetchWithAuth(
+                `${API_URL}/chat/rooms/${this.currentRoomId}/participants?user_id=${userId}`,
+                { method: 'POST' }
+            );
+            
+            if (response.ok) {
+                alert('Participant added successfully!');
+                document.getElementById('addParticipantId').value = '';
+                await this.loadRoomDetails(this.currentRoomId);
+                this.loadGroupParticipants();
+            } else {
+                const error = await response.json();
+                alert(error.detail || 'Failed to add participant');
+            }
+        } catch (error) {
+            alert('Network error. Please try again.');
+        }
+    },
+
+    async removeParticipant(userId) {
+        if (!confirm('Are you sure you want to remove this participant?')) {
+            return;
+        }
+        
+        try {
+            const response = await this.fetchWithAuth(
+                `${API_URL}/chat/rooms/${this.currentRoomId}/participants/${userId}`,
+                { method: 'DELETE' }
+            );
+            
+            if (response.ok) {
+                alert('Participant removed successfully!');
+                await this.loadRoomDetails(this.currentRoomId);
+                this.loadGroupParticipants();
+            } else {
+                const error = await response.json();
+                alert(error.detail || 'Failed to remove participant');
+            }
+        } catch (error) {
+            alert('Network error. Please try again.');
+        }
+    },
+
+    async updateGroupName() {
+        const newName = document.getElementById('editGroupName').value.trim();
+        
+        if (!newName) {
+            alert('Please enter a group name');
+            return;
+        }
+        
+        try {
+            const response = await this.fetchWithAuth(
+                `${API_URL}/chat/rooms/${this.currentRoomId}?name=${encodeURIComponent(newName)}`,
+                { method: 'PUT' }
+            );
+            
+            if (response.ok) {
+                alert('Group name updated!');
+                await this.loadUserChats();
+                await this.loadRoomDetails(this.currentRoomId);
+                document.getElementById('chatTitle').textContent = newName;
+            } else {
+                const error = await response.json();
+                alert(error.detail || 'Failed to update name');
+            }
+        } catch (error) {
+            alert('Network error. Please try again.');
+        }
     },
 
     async loadChatHistory(roomId) {
@@ -387,7 +547,7 @@ const app = {
         this.ws.onopen = () => {
             document.getElementById('chatStatus').textContent = '● Connected';
             console.log('✓ WebSocket connected');
-            this.reconnectAttempts = 0; // Reset on successful connection
+            this.reconnectAttempts = 0;
         };
 
         this.ws.onmessage = (event) => {
@@ -414,7 +574,6 @@ const app = {
             document.getElementById('chatStatus').textContent = '● Disconnected';
             console.log('WebSocket disconnected');
             
-            // Auto-reconnect if it was an abnormal closure
             if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
                 this.reconnectAttempts++;
                 console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
@@ -422,7 +581,7 @@ const app = {
                     if (this.currentRoomId) {
                         this.connectWebSocket(this.currentRoomId);
                     }
-                }, 2000 * this.reconnectAttempts); // Exponential backoff
+                }, 2000 * this.reconnectAttempts);
             }
         };
     },
