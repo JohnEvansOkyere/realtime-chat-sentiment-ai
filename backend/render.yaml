@@ -1,0 +1,30 @@
+# render.yaml
+services:
+  # Backend API
+  - type: web
+    name: chat-sentiment-api
+    runtime: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+    healthCheckPath: /api/v1/auth/login
