@@ -1,5 +1,6 @@
 // frontend/app.js
-const API_URL = 'http://localhost:8000/api/v1';
+const API_URL = config.API_URL;
+const WS_URL = config.WS_URL;
 
 const app = {
     currentUser: null,
@@ -707,3 +708,4 @@ if (document.readyState === 'loading') {
 } else {
     app.init();
 }
+
