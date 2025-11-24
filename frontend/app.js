@@ -22,7 +22,7 @@ const app = {
 
     // Check for existing session on page load
     checkExistingSession() {
-        const token = localStorage.getItem('accessToken');
+        const token = this.accessToken;
         const userStr = localStorage.getItem('currentUser');
         
         if (token && userStr) {
@@ -559,7 +559,12 @@ const app = {
             this.ws.close();
         }
 
-           const token = localStorage.getItem('access_token');
+           const token = this.accessToken;
+           if (!token) {
+                console.error('No access token! User might be logged out.');
+                this.logout();
+                return;
+             }
            this.ws = new WebSocket(`${WS_URL}/ws/${roomId}?token=${token}`); 
 
         this.ws.onopen = () => {
