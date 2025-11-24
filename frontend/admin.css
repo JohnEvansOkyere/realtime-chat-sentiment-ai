@@ -24,6 +24,7 @@ body {
     border-radius: 20px;
     margin-bottom: 30px;
     box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    position: relative; 
 }
 
 .dashboard-header h1 {
@@ -241,15 +242,6 @@ tbody tr:hover {
     font-style: italic;
 }
 
-@media (max-width: 768px) {
-    .charts-container {
-        grid-template-columns: 1fr;
-    }
-    
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-}
 
 .back-btn {
     position: absolute;
@@ -268,4 +260,340 @@ tbody tr:hover {
 .back-btn:hover {
     background: rgba(255, 255, 255, 0.2);
     transform: translateX(-2px);
+}
+
+
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    /* Dashboard Header */
+    .dashboard-header {
+        padding: 60px 20px 30px 20px; /* Extra top padding for back button */
+        margin-bottom: 20px;
+        position: relative;
+    }
+    
+    .dashboard-header h1 {
+        font-size: 24px;
+        margin-bottom: 8px;
+    }
+    
+    .subtitle {
+        font-size: 14px;
+    }
+    
+    /* Back Button - Position for Mobile */
+    .back-btn {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+    
+    /* Stats Grid - Stack Vertically */
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card {
+        padding: 20px;
+        gap: 15px;
+    }
+    
+    .stat-icon {
+        font-size: 32px;
+        width: 60px;
+        height: 60px;
+    }
+    
+    .stat-label {
+        font-size: 12px;
+    }
+    
+    .stat-value {
+        font-size: 26px;
+    }
+    
+    /* Charts - Stack Vertically */
+    .charts-container {
+        grid-template-columns: 1fr;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .chart-card {
+        padding: 20px;
+    }
+    
+    .chart-card h3 {
+        font-size: 16px;
+        margin-bottom: 15px;
+    }
+    
+    /* Canvas height adjustment for mobile */
+    .chart-card canvas {
+        max-height: 250px;
+    }
+    
+    /* Alerts Section */
+    .alerts-section {
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .alerts-section h3 {
+        font-size: 16px;
+        margin-bottom: 15px;
+    }
+    
+    .alerts-list {
+        gap: 12px;
+    }
+    
+    .alert-item {
+        padding: 12px;
+    }
+    
+    .alert-header {
+        flex-direction: column;
+        gap: 5px;
+        align-items: flex-start;
+    }
+    
+    .alert-user {
+        font-size: 14px;
+    }
+    
+    .alert-time {
+        font-size: 11px;
+    }
+    
+    .alert-room {
+        font-size: 11px;
+    }
+    
+    .alert-content {
+        font-size: 14px;
+        line-height: 1.4;
+    }
+    
+    /* Table Section */
+    .table-section {
+        padding: 20px;
+    }
+    
+    .table-section h3 {
+        font-size: 16px;
+        margin-bottom: 15px;
+    }
+    
+    /* Table - Horizontal Scroll */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -20px; /* Extend to edges */
+        padding: 0 20px;
+    }
+    
+    table {
+        min-width: 600px; /* Force horizontal scroll */
+        font-size: 13px;
+    }
+    
+    th {
+        padding: 10px 8px;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+    
+    td {
+        padding: 10px 8px;
+        font-size: 13px;
+    }
+    
+    /* Loading/No Data States */
+    .loading,
+    .no-data {
+        padding: 30px 15px;
+        font-size: 14px;
+    }
+}
+
+/* Extra Small Phones (320px - 480px) */
+@media (max-width: 480px) {
+    body {
+        padding: 5px;
+    }
+    
+    .dashboard-header {
+        padding: 50px 15px 25px 15px;
+        border-radius: 15px;
+    }
+    
+    .dashboard-header h1 {
+        font-size: 20px;
+    }
+    
+    .subtitle {
+        font-size: 13px;
+    }
+    
+    .back-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    /* Stats - More Compact */
+    .stat-card {
+        padding: 15px;
+        gap: 12px;
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .stat-icon {
+        font-size: 28px;
+        width: 50px;
+        height: 50px;
+        margin: 0 auto;
+    }
+    
+    .stat-content {
+        width: 100%;
+    }
+    
+    .stat-value {
+        font-size: 22px;
+    }
+    
+    /* Charts */
+    .chart-card {
+        padding: 15px;
+        border-radius: 12px;
+    }
+    
+    .chart-card canvas {
+        max-height: 200px;
+    }
+    
+    /* Alerts */
+    .alerts-section {
+        padding: 15px;
+        border-radius: 12px;
+    }
+    
+    .alert-item {
+        padding: 10px;
+        font-size: 13px;
+    }
+    
+    /* Table */
+    .table-section {
+        padding: 15px;
+        border-radius: 12px;
+    }
+    
+    table {
+        min-width: 550px;
+        font-size: 12px;
+    }
+    
+    th {
+        padding: 8px 6px;
+        font-size: 10px;
+    }
+    
+    td {
+        padding: 8px 6px;
+        font-size: 12px;
+    }
+}
+
+/* Landscape Mode on Phones */
+@media (max-height: 500px) and (orientation: landscape) {
+    .dashboard-header {
+        padding: 40px 20px 20px 20px;
+        margin-bottom: 15px;
+    }
+    
+    .dashboard-header h1 {
+        font-size: 20px;
+    }
+    
+    .stat-card {
+        padding: 15px;
+    }
+    
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 28px;
+    }
+    
+    .chart-card canvas {
+        max-height: 180px;
+    }
+}
+
+/* Tablets (768px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .dashboard-header {
+        padding: 35px;
+    }
+    
+    .dashboard-header h1 {
+        font-size: 28px;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .charts-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Touch Device Improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets */
+    .back-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    .stat-card {
+        cursor: default;
+    }
+    
+    .alert-item {
+        cursor: default;
+    }
+    
+    /* Better scroll indicators */
+    .table-container {
+        scrollbar-width: thin;
+    }
+    
+    .table-container::-webkit-scrollbar {
+        height: 6px;
+    }
+    
+    .table-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    
+    .table-container::-webkit-scrollbar-thumb {
+        background: #667eea;
+        border-radius: 3px;
+    }
 }

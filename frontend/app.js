@@ -709,3 +709,103 @@ if (document.readyState === 'loading') {
     app.init();
 }
 
+
+
+// ============================================
+// MOBILE MENU FUNCTIONALITY
+// ============================================
+
+// Create mobile menu button
+function initMobileMenu() {
+    // Only on mobile
+    if (window.innerWidth <= 768) {
+        const chatContainer = document.getElementById('chatContainer');
+        if (chatContainer && chatContainer.style.display !== 'none') {
+            // Remove existing button
+            const existingBtn = document.getElementById('mobileMenuBtn');
+            if (existingBtn) existingBtn.remove();
+            
+            // Create new button
+            const menuBtn = document.createElement('button');
+            menuBtn.id = 'mobileMenuBtn';
+            menuBtn.className = 'menu-toggle';
+            menuBtn.innerHTML = '☰';
+            menuBtn.onclick = toggleMobileSidebar;
+            
+            document.body.appendChild(menuBtn);
+        }
+    } else {
+        // Remove button on desktop
+        const existingBtn = document.getElementById('mobileMenuBtn');
+        if (existingBtn) existingBtn.remove();
+    }
+}
+
+function toggleMobileSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+    
+    sidebar.classList.toggle('show');
+    
+    // Update button icon
+    const menuBtn = document.getElementById('mobileMenuBtn');
+    if (sidebar.classList.contains('show')) {
+        menuBtn.innerHTML = '✕';
+        // Close when clicking outside
+        setTimeout(() => {
+            document.addEventListener('click', closeSidebarOnClickOutside);
+        }, 100);
+    } else {
+        menuBtn.innerHTML = '☰';
+        document.removeEventListener('click', closeSidebarOnClickOutside);
+    }
+}
+
+function closeSidebarOnClickOutside(e) {
+    const sidebar = document.querySelector('.sidebar');
+    const menuBtn = document.getElementById('mobileMenuBtn');
+    
+    if (!sidebar.contains(e.target) && e.target !== menuBtn) {
+        sidebar.classList.remove('show');
+        menuBtn.innerHTML = '☰';
+        document.removeEventListener('click', closeSidebarOnClickOutside);
+    }
+}
+
+// Also close sidebar when selecting a chat
+const originalLoadChat = app.loadChat;
+app.loadChat = function(roomId) {
+    originalLoadChat.call(this, roomId);
+    
+    // Close sidebar on mobile after selecting chat
+    if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.sidebar');
+        const menuBtn = document.getElementById('mobileMenuBtn');
+        if (sidebar && menuBtn) {
+            sidebar.classList.remove('show');
+            menuBtn.innerHTML = '☰';
+            document.removeEventListener('click', closeSidebarOnClickOutside);
+        }
+    }
+};
+
+// Initialize mobile menu when showing chat
+const originalShowChatContainer = app.showChat;
+app.showChat = function() {
+    originalShowChatContainer.call(this);
+    setTimeout(initMobileMenu, 100);
+};
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    initMobileMenu();
+    
+    // Remove show class on desktop
+    if (window.innerWidth > 768) {
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) sidebar.classList.remove('show');
+    }
+});
+
+// Initialize on page load
+window.addEventListener('DOMContentLoaded', initMobileMenu);
