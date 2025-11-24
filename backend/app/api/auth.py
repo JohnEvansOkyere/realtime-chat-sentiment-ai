@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from ..schemas.user import UserCreate, UserLogin, TokenResponse, TokenRefresh, UserResponse
 from ..services.auth_service import auth_service
 from .dependencies import get_current_active_user
+from ..schemas.user import PasswordResetRequest, PasswordResetConfirm, PasswordResetResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -109,3 +110,49 @@ async def logout(current_user: UserResponse = Depends(get_current_active_user)):
     Business Value: Explicit session termination
     """
     return {"message": "Successfully logged out"}
+
+
+@router.post("/forgot-password", response_model=PasswordResetResponse)
+async def forgot_password(request: PasswordResetRequest):
+    """
+    Request password reset email.
+    
+    Business Value: User account recovery
+    Security: Always returns success to prevent email enumeration
+    """
+    await auth_service.request_password_reset(request.email)
+    
+    return PasswordResetResponse(
+        message="If an account exists with this email, a password reset link has been sent.",
+        email=request.email
+    )
+
+
+@router.post("/reset-password")
+async def reset_password(reset_data: PasswordResetConfirm):
+    """
+    Reset password using token from email.
+    
+    Business Value: Secure password recovery
+    """
+    try:
+        success = await auth_service.reset_password(
+            reset_data.token,
+            reset_data.new_password
+        )
+        
+        if success:
+            return {
+                "message": "Password reset successfully. You can now login with your new password."
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to reset password"
+            )
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

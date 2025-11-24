@@ -593,6 +593,103 @@ body {
     background: #c82333;
 }
 
+
+/* Forgot Password Link */
+.forgot-password-link {
+    text-align: right;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.forgot-password-link a {
+    color: #667eea;
+    text-decoration: none;
+    font-size: 13px;
+    transition: color 0.3s;
+}
+
+.forgot-password-link a:hover {
+    color: #5568d3;
+    text-decoration: underline;
+}
+
+/* Info Box for Forgot Password Page */
+.info-box {
+    background: #2a2a2a;
+    border-left: 4px solid #667eea;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.info-box p {
+    color: #ccc;
+    font-size: 13px;
+    margin: 0;
+}
+
+/* Password Requirements */
+.password-requirements {
+    background: #2a2a2a;
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+.password-requirements p {
+    color: #999;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.requirement {
+    color: #666;
+    margin: 4px 0;
+}
+
+.requirement.valid {
+    color: #00C851;
+}
+
+.requirement::before {
+    content: "○ ";
+}
+
+.requirement.valid::before {
+    content: "✓ ";
+    font-weight: bold;
+}
+
+/* Invalid Token Message */
+.invalid-token {
+    text-align: center;
+    padding: 20px;
+}
+
+.invalid-token h2 {
+    color: #ff4444;
+    margin-bottom: 15px;
+}
+
+.invalid-token p {
+    color: #999;
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.invalid-token a {
+    color: #667eea;
+    text-decoration: none;
+    font-size: 16px;
+}
+
+.invalid-token a:hover {
+    text-decoration: underline;
+}
+
+
+
 /* Responsive */
 @media (max-width: 768px) {
     .sidebar {

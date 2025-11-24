@@ -13,7 +13,8 @@ from datetime import datetime
 from ..core.security import security_service
 from ..models.database import db_service
 from ..schemas.user import UserCreate, UserResponse, TokenResponse
-
+from ..core.security import security_service
+from .email_service import email_service
 
 class AuthenticationService:
     """Handles all authentication-related operations."""
@@ -149,6 +150,125 @@ class AuthenticationService:
         user.pop('hashed_password', None)
         
         return UserResponse(**user)
+    
+
+
+    async def request_password_reset(self, email: str) -> bool:
+        """
+        Request password reset by email.
+        
+        Args:
+            email: User's email address
+        
+        Returns:
+            True if email sent (always return True to prevent email enumeration)
+        
+        Business Value: Secure password recovery
+        Time Complexity: O(1)
+        """
+        db = db_service.get_admin_client()
+        
+        try:
+            # Check if user exists
+            result = db.table('users')\
+                .select('id, email, username')\
+                .eq('email', email)\
+                .single()\
+                .execute()
+            
+            if not result.data:
+                # Don't reveal if email exists (security best practice)
+                # Still return True to prevent email enumeration attacks
+                print(f"Password reset requested for non-existent email: {email}")
+                return True
+            
+            user = result.data
+            
+            # Generate reset token
+            reset_token = security_service.create_reset_token(email)            
+            # Store token in database (optional - for single-use tokens)
+            # For now, we'll rely on JWT expiration
+            
+            # Send email
+            email_sent = email_service.send_password_reset_email(
+                email=user['email'],
+                reset_token=reset_token,
+                username=user['username']
+            )
+            
+            if email_sent:
+                print(f"✓ Password reset email sent to {email}")
+            else:
+                print(f"✗ Failed to send password reset email to {email}")
+            
+            # Always return True (don't reveal if email exists)
+            return True
+        
+        except Exception as e:
+            print(f"Error in request_password_reset: {e}")
+            # Still return True to prevent enumeration
+            return True
+    
+    async def reset_password(self, token: str, new_password: str) -> bool:
+        """
+        Reset password using reset token.
+        
+        Args:
+            token: JWT reset token
+            new_password: New password (plain text)
+        
+        Returns:
+            True if password reset successfully
+        
+        Raises:
+            ValueError: If token is invalid or expired
+        
+        Business Value: Secure password reset
+        Time Complexity: O(1)
+        """
+        # Verify token
+        email = security_service.verify_reset_token(token)
+        if not email:
+            raise ValueError("Invalid or expired reset token")
+        
+        db = db_service.get_admin_client()
+        
+        try:
+            # Get user
+            result = db.table('users')\
+                .select('id, email')\
+                .eq('email', email)\
+                .single()\
+                .execute()
+            
+            if not result.data:
+                raise ValueError("User not found")
+            
+            user = result.data
+            
+            # Hash new password
+            hashed_password = bcrypt.hashpw(
+                new_password.encode('utf-8'),
+                bcrypt.gensalt()
+            )
+            
+            # Update password in database
+            update_result = db.table('users')\
+                .update({'hashed_password': hashed_password.decode('utf-8')})\
+                .eq('id', user['id'])\
+                .execute()
+            
+            if not update_result.data:
+                raise ValueError("Failed to update password")
+            
+            print(f"✓ Password reset successfully for {email}")
+            return True
+        
+        except Exception as e:
+            print(f"Error in reset_password: {e}")
+            raise ValueError(f"Failed to reset password: {str(e)}")
+        
+
     
     async def refresh_access_token(self, refresh_token: str) -> Optional[TokenResponse]:
         """

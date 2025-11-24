@@ -85,6 +85,58 @@ class SecurityService:
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         return encoded_jwt
     
+
+    # Creating reset token
+    def create_reset_token(self, email: str) -> str:
+        """
+        Create password reset token (valid for 1 hour).
+        
+        Args:
+            email: User's email address
+        
+        Returns:
+            JWT reset token
+        
+        Business Value: Secure, time-limited password reset
+        """
+        expire = datetime.utcnow() + timedelta(hours=1)
+        
+        payload = {
+            "sub": email,
+            "exp": expire,
+            "type": "reset"  # Important: distinguish from access tokens
+        }
+        
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+        return token
+
+
+    def verify_reset_token(self, token: str) -> Optional[str]:
+        """
+        Verify password reset token and extract email.
+        
+        Args:
+            token: JWT reset token
+        
+        Returns:
+            Email if valid, None if invalid/expired
+        """
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+            
+            # Check token type
+            if payload.get("type") != "reset":
+                return None
+            
+            email: str = payload.get("sub")
+            if email is None:
+                return None
+            
+            return email
+            
+        except JWTError:
+            return None
+    
     def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
         """
         Decode and verify a JWT token.

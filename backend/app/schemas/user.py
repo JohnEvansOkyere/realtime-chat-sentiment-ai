@@ -5,7 +5,7 @@
 Pydantic schemas for user-related requests and responses.
 Provides validation and serialization for API endpoints.
 """
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -61,3 +61,38 @@ class PasswordResetConfirm(BaseModel):
     """Schema for password reset confirmation."""
     token: str
     new_password: str = Field(..., min_length=8, max_length=100)
+
+
+
+class PasswordResetRequest(BaseModel):
+    """Schema for requesting password reset."""
+    email: EmailStr
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "email": "user@example.com"
+            }
+        }
+    )
+
+
+class PasswordResetConfirm(BaseModel):
+    """Schema for confirming password reset with token."""
+    token: str
+    new_password: str = Field(..., min_length=8, max_length=100)
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "new_password": "newSecurePassword123"
+            }
+        }
+    )
+
+
+class PasswordResetResponse(BaseModel):
+    """Response after requesting password reset."""
+    message: str
+    email: str

@@ -32,8 +32,6 @@ app.include_router(websocket.router, prefix=settings.API_V1_STR)
 app.include_router(analytics.router, prefix=settings.API_V1_STR)
 
 # Serve static files (frontend)
-# app.mount("/static", StaticFiles(directory="/app/frontend"), name="static")  # <-- Comment this out
-
 
 @app.get("/")
 async def root():
