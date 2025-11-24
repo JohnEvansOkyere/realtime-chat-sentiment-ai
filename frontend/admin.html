@@ -13,6 +13,7 @@
         <header class="dashboard-header">
             <h1>📊 Sentiment Analytics Dashboard</h1>
             <p class="subtitle">Real-time AI-powered conversation insights</p>
+            <button class="back-btn" onclick="window.location.href='index.html'">← Back to Chat</button>
         </header>
 
         <!-- Stats Cards -->
@@ -90,6 +91,8 @@
         </div>
     </div>
 
+    <!-- CRITICAL: Load config.js BEFORE admin.js -->
+    <script src="config.js"></script>
     <script src="admin.js"></script>
 </body>
 </html>
