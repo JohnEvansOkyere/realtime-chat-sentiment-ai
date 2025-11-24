@@ -559,8 +559,8 @@ const app = {
             this.ws.close();
         }
 
-        const wsUrl = `ws://localhost:8000/api/v1/ws/${roomId}?token=${this.accessToken}`;
-        this.ws = new WebSocket(wsUrl);
+           const token = localStorage.getItem('access_token');
+           this.ws = new WebSocket(`${WS_URL}/ws/${roomId}?token=${token}`); 
 
         this.ws.onopen = () => {
             document.getElementById('chatStatus').textContent = '● Connected';
