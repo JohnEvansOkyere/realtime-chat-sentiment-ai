@@ -37,7 +37,7 @@ async def get_sentiment_overview(
         from datetime import datetime, timedelta
         start_date = datetime.utcnow() - timedelta(days=days)
         
-        # ✅ Get all messages with sentiment column (not sentiment_label)
+        #  Get all messages with sentiment column (not sentiment_label)
         result = db.table('messages').select(
             'id, sentiment, created_at'
         ).gte(
@@ -66,7 +66,7 @@ async def get_sentiment_overview(
             if sentiment in daily_data[date]:
                 daily_data[date][sentiment] += 1
         
-        # ✅ Create complete daily trends (fill missing dates with zeros)
+        # Create complete daily trends (fill missing dates with zeros)
         daily_trends = []
         for i in range(days):
             date = (datetime.utcnow() - timedelta(days=days-1-i)).date().isoformat()
@@ -157,11 +157,7 @@ async def get_negative_alerts(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
-
-
-# backend/app/api/analytics.py
-# Update get_sentiment_by_user function:
-
+# Get Sebtiment by user
 @router.get("/sentiment/by-user")
 async def get_sentiment_by_user(
     days: int = Query(7, ge=1, le=90),

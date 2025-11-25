@@ -25,15 +25,14 @@ async def register_admin(
     """
     from ..core.config import settings
     
-    # Check admin secret (set in .env: ADMIN_SECRET_KEY=your-secret)
-    if admin_secret != "your-super-secret-admin-key":  # Use settings.ADMIN_SECRET_KEY in production
+    # Check admin secret 
+    if admin_secret != "your-super-secret-admin-key":  
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid admin secret"
         )
     
-    # Create admin user (modify auth_service.register_user to accept is_admin param)
-    # For now, create normally then update
+    # Create admin user 
     result = await auth_service.register_user(user_data)
     
     # Update to admin
@@ -116,7 +115,6 @@ async def logout(current_user: UserResponse = Depends(get_current_active_user)):
 async def reset_password_simple(reset_data: PasswordResetSimple):
     """
     Simple password reset - just email + new password (NO email verification)
-    ⚠️ Less secure but simpler for development
     """
     success = await auth_service.reset_password_simple(
         reset_data.email,

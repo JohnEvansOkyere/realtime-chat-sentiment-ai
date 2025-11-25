@@ -109,8 +109,6 @@ async def send_message(
             detail=str(e)
         )
     
-# backend/app/api/chat.py
-# Add these new endpoints:
 
 @router.post("/rooms/{room_id}/participants", status_code=status.HTTP_201_CREATED)
 async def add_participant_to_room(

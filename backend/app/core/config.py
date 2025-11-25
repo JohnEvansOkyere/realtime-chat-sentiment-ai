@@ -51,8 +51,6 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@okyerevansjohn@gmail.com.com"
     
-    # SendGrid (optional alternative)
-    SENDGRID_API_KEY: str = ""
     
 
 
