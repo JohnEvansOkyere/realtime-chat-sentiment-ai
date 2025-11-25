@@ -47,7 +47,8 @@ class ConnectionManager:
             user_id: User identifier
         """
         if user_id in self.active_connections:
-            self.active_connections[user_id].remove(websocket)
+            if websocket in self.active_connections[user_id]:
+                self.active_connections[user_id].remove(websocket)
             
             # Remove user entry if no more connections
             if not self.active_connections[user_id]:
@@ -154,6 +155,19 @@ class ConnectionManager:
             True if user has active connections
         """
         return user_id in self.active_connections and len(self.active_connections[user_id]) > 0
+    
+    def is_user_in_room(self, user_id: str, room_id: str) -> bool:
+        """
+        Check if user is already in a specific room.
+        
+        Args:
+            user_id: User identifier
+            room_id: Chat room identifier
+            
+        Returns:
+            True if user is in the room
+        """
+        return room_id in self.room_participants and user_id in self.room_participants[room_id]
 
 
 # Singleton instance

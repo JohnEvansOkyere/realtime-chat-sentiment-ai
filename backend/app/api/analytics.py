@@ -27,55 +27,78 @@ async def get_sentiment_overview(
     days: int = Query(7, ge=1, le=90),
     current_user: UserResponse = Depends(get_admin_user)
 ):
-    """Get sentiment distribution over time."""
+    """Get sentiment distribution and daily trends."""
     db = db_service.get_admin_client()
     
     try:
-        # Calculate date threshold
-        date_threshold = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        print(f"📊 Fetching sentiment overview for last {days} days")
         
-        # Get sentiment counts
-        result = db.table('messages')\
-            .select('sentiment, created_at')\
-            .gte('created_at', date_threshold)\
-            .not_.is_('sentiment', 'null')\
-            .execute()
+        # Calculate date range
+        from datetime import datetime, timedelta
+        start_date = datetime.utcnow() - timedelta(days=days)
         
-        if not result.data:
-            return {
-                "total_messages": 0,
-                "sentiment_distribution": {},
-                "daily_trends": []
-            }
+        # ✅ Get all messages with sentiment column (not sentiment_label)
+        result = db.table('messages').select(
+            'id, sentiment, created_at'
+        ).gte(
+            'created_at', start_date.isoformat()
+        ).execute()
         
-        # Count sentiments
-        sentiment_counts = {}
-        for msg in result.data:
-            sentiment = msg['sentiment']
-            sentiment_counts[sentiment] = sentiment_counts.get(sentiment, 0) + 1
+        messages = result.data
+        print(f"📊 Found {len(messages)} messages")
         
-        # Calculate daily trends
+        # Count sentiment distribution
+        sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
         daily_data = {}
-        for msg in result.data:
+        
+        for msg in messages:
+            sentiment = msg.get('sentiment', 'neutral')
+            
+            # Update total counts
+            if sentiment in sentiment_counts:
+                sentiment_counts[sentiment] += 1
+            
+            # Update daily counts
             date = msg['created_at'][:10]  # Get YYYY-MM-DD
             if date not in daily_data:
                 daily_data[date] = {"positive": 0, "negative": 0, "neutral": 0}
-            daily_data[date][msg['sentiment']] += 1
+            
+            if sentiment in daily_data[date]:
+                daily_data[date][sentiment] += 1
         
-        daily_trends = [
-            {"date": date, **counts}
-            for date, counts in sorted(daily_data.items())
-        ]
+        # ✅ Create complete daily trends (fill missing dates with zeros)
+        daily_trends = []
+        for i in range(days):
+            date = (datetime.utcnow() - timedelta(days=days-1-i)).date().isoformat()
+            
+            if date in daily_data:
+                daily_trends.append({
+                    "date": date,
+                    "positive": daily_data[date]["positive"],
+                    "negative": daily_data[date]["negative"],
+                    "neutral": daily_data[date]["neutral"]
+                })
+            else:
+                # Fill missing dates with zeros
+                daily_trends.append({
+                    "date": date,
+                    "positive": 0,
+                    "negative": 0,
+                    "neutral": 0
+                })
+        
+        print(f"📊 Sentiment distribution: {sentiment_counts}")
+        print(f"📊 Daily trends: {len(daily_trends)} days")
         
         return {
-            "total_messages": len(result.data),
+            "total_messages": len(messages),
             "sentiment_distribution": sentiment_counts,
             "daily_trends": daily_trends,
             "period_days": days
         }
-    
+        
     except Exception as e:
-        print(f"ERROR in get_sentiment_overview: {e}")
+        print(f"❌ ERROR in get_sentiment_overview: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(

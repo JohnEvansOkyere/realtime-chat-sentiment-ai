@@ -225,16 +225,32 @@ const adminDashboard = {
             return;
         }
 
-        container.innerHTML = alerts.map(alert => `
-            <div class="alert-item">
-                <div class="alert-header">
-                    <span class="alert-user">@${this.escapeHtml(alert.sender)}</span>
-                    <span class="alert-time">${new Date(alert.timestamp).toLocaleString()}</span>
+        container.innerHTML = alerts.map(alert => {
+            // Calculate time ago
+            const date = new Date(alert.timestamp);
+            const timeAgo = this.getTimeAgo(date);
+            
+            return `
+                <div class="alert-item">
+                    <div class="alert-header">
+                        <span class="alert-user">👤 ${this.escapeHtml(alert.sender)}</span>
+                        <span class="alert-time">${timeAgo}</span>
+                    </div>
+                    <div class="alert-room">📍 ${this.escapeHtml(alert.chat_room)}</div>
+                    <div class="alert-content">"${this.escapeHtml(alert.content)}"</div>
                 </div>
-                <div class="alert-room">💬 ${this.escapeHtml(alert.chat_room)}</div>
-                <div class="alert-content">${this.escapeHtml(alert.content)}</div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+    },
+
+    getTimeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+        if (seconds < 2592000) return `${Math.floor(seconds / 86400)} days ago`;
+        return date.toLocaleDateString();
     },
 
     async loadUserSentiments() {

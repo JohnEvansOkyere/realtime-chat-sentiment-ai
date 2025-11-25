@@ -2,6 +2,10 @@
 const API_URL = config.API_URL;
 const WS_URL = config.WS_URL;
 
+console.log('🔧 Backend Mode:', window.location.hostname === 'localhost' ? 'LOCAL' : 'PRODUCTION');
+console.log('📡 API_URL:', API_URL);
+console.log('🔌 WS_URL:', WS_URL);
+
 const app = {
     currentUser: null,
     accessToken: null,
@@ -20,9 +24,9 @@ const app = {
         this.setupEventListeners();
     },
 
-    // Check for existing session on page load
+    // ✅ FIXED: Check for existing session on page load
     checkExistingSession() {
-        const token = this.accessToken;
+        const token = localStorage.getItem('accessToken');  // ✅ Fixed: Load from localStorage
         const userStr = localStorage.getItem('currentUser');
         
         if (token && userStr) {
@@ -70,7 +74,6 @@ const app = {
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
         
-        // Auto-hide error after 5 seconds
         setTimeout(() => {
             errorDiv.style.display = 'none';
         }, 5000);
@@ -164,21 +167,16 @@ const app = {
     },
 
     logout() {
-        // Close WebSocket
         if (this.ws) {
             this.ws.close();
             this.ws = null;
         }
         
-        // Clear session
         this.clearSession();
-        
-        // Reset UI
         this.currentRoomId = null;
         this.currentRoomDetails = null;
         this.userChats = [];
         
-        // Show auth screen
         document.getElementById('chatContainer').style.display = 'none';
         document.getElementById('authContainer').style.display = 'flex';
         this.showLogin();
@@ -198,7 +196,6 @@ const app = {
             <small>ID: ${this.currentUser.id}</small>
         `;
         
-        // Show/hide analytics button based on admin status
         const adminButton = document.querySelector('.admin-link-btn');
         if (adminButton) {
             adminButton.style.display = this.currentUser.is_admin ? 'block' : 'none';
@@ -206,6 +203,9 @@ const app = {
         
         this.loadUserChats();
         this.setupEventListeners();
+        
+        // Initialize mobile menu
+        setTimeout(() => initMobileMenu(), 100);
     },
 
     // API call wrapper with token refresh
@@ -217,15 +217,12 @@ const app = {
 
         let response = await fetch(url, options);
 
-        // If unauthorized, try to refresh token
         if (response.status === 401) {
             const refreshed = await this.refreshAccessToken();
             if (refreshed) {
-                // Retry with new token
                 options.headers['Authorization'] = `Bearer ${this.accessToken}`;
                 response = await fetch(url, options);
             } else {
-                // Refresh failed, logout
                 this.logout();
                 throw new Error('Session expired. Please login again.');
             }
@@ -299,6 +296,7 @@ const app = {
     },
 
     async selectChat(roomId, chatElement) {
+        console.log('📂 Chat selected:', roomId);
         this.currentRoomId = roomId;
         
         // Update active state
@@ -307,7 +305,7 @@ const app = {
         });
         chatElement.classList.add('active');
 
-        // Load room details to check if user is admin
+        // Load room details
         await this.loadRoomDetails(roomId);
 
         const chat = this.userChats.find(c => c.id === roomId);
@@ -320,6 +318,16 @@ const app = {
 
         // Connect WebSocket
         this.connectWebSocket(roomId);
+        
+        // Close mobile sidebar if open
+        if (window.innerWidth <= 768) {
+            const sidebar = document.querySelector('.sidebar');
+            const menuBtn = document.getElementById('mobileMenuBtn');
+            if (sidebar && menuBtn) {
+                sidebar.classList.remove('show');
+                menuBtn.innerHTML = '☰';
+            }
+        }
     },
 
     async loadRoomDetails(roomId) {
@@ -336,31 +344,16 @@ const app = {
     },
 
     updateGroupManagementUI() {
-        console.log('=== DEBUG: updateGroupManagementUI called ===');
-        console.log('currentRoomDetails:', this.currentRoomDetails);
-        console.log('currentUser:', this.currentUser);
-        
         const chatHeader = document.querySelector('.chat-header');
-        console.log('chatHeader found:', !!chatHeader);
         
         // Remove existing management button if any
         const existingBtn = document.getElementById('manageGroupBtn');
         if (existingBtn) existingBtn.remove();
         
-        // Check conditions
-        if (this.currentRoomDetails) {
-            console.log('Room is_group:', this.currentRoomDetails.is_group);
-            console.log('Room created_by:', this.currentRoomDetails.created_by);
-            console.log('Current user ID:', this.currentUser.id);
-            console.log('User is creator:', this.currentRoomDetails.created_by === this.currentUser.id);
-        }
-        
         // Only show for group chats where current user is creator
         if (this.currentRoomDetails && 
             this.currentRoomDetails.is_group && 
             this.currentRoomDetails.created_by === this.currentUser.id) {
-            
-            console.log('✓ Creating manage button!');
             
             const manageBtn = document.createElement('button');
             manageBtn.id = 'manageGroupBtn';
@@ -369,15 +362,12 @@ const app = {
             manageBtn.onclick = () => this.showGroupManagementModal();
             
             chatHeader.appendChild(manageBtn);
-            console.log('✓ Button added to DOM');
-        } else {
-            console.log('✗ Conditions not met - button not created');
         }
     },
+
     showGroupManagementModal() {
         document.getElementById('groupManagementModal').classList.add('active');
         
-        // Pre-fill group name
         if (this.currentRoomDetails && this.currentRoomDetails.name) {
             document.getElementById('editGroupName').value = this.currentRoomDetails.name;
         }
@@ -527,24 +517,32 @@ const app = {
 
     addMessageToUI(message) {
         const container = document.getElementById('messagesContainer');
-        
-        // Remove welcome message if exists
         const welcome = container.querySelector('.welcome-message');
         if (welcome) welcome.remove();
-        
+
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${message.sender_id === this.currentUser.id ? 'own' : ''}`;
 
         const timestamp = message.created_at || message.timestamp;
-        const time = new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const time = new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+        // ONLY SHOW SENTIMENT BADGE TO ADMINS
+        let sentimentBadge = '';
+        if (this.currentUser?.is_admin && message.sentiment) {
+            sentimentBadge = `<span class="sentiment-badge sentiment-${message.sentiment}">
+                ${message.sentiment.toUpperCase()}
+            </span>`;
+        }
 
         messageDiv.innerHTML = `
             <div class="message-content">
-                ${message.sender_id !== this.currentUser.id ? 
-                    `<div class="message-sender">${this.escapeHtml(message.sender_username)}</div>` : ''}
+                ${message.sender_id !== this.currentUser.id ?
+                    `<div class="message-sender">${this.escapeHtml(message.sender_username)}</div>` : ''
+                }
                 <div class="message-text">${this.escapeHtml(message.content)}</div>
                 <div class="message-footer">
                     <span class="message-time">${time}</span>
+                    ${sentimentBadge}
                 </div>
             </div>
         `;
@@ -553,63 +551,92 @@ const app = {
         container.scrollTop = container.scrollHeight;
     },
 
+    // ✅ FIXED: WebSocket connection
     connectWebSocket(roomId) {
-        // Close existing connection
+        console.log('🔌 Connecting WebSocket to room:', roomId);
+        
+        const token = localStorage.getItem('accessToken');  // ✅ Fixed: Correct key
+        if (!token) {
+            console.error('❌ No access token found');
+            return;
+        }
+        
+        if (typeof WS_URL === 'undefined') {
+            console.error('❌ WS_URL is not defined! Check config.js is loaded.');
+            return;
+        }
+        
+        console.log('🔌 WebSocket URL:', `${WS_URL}/ws/${roomId}`);
+        
         if (this.ws) {
             this.ws.close();
+            this.ws = null;
         }
-
-           const token = this.accessToken;
-           if (!token) {
-                console.error('No access token! User might be logged out.');
-                this.logout();
-                return;
-             }
-           this.ws = new WebSocket(`${WS_URL}/ws/${roomId}?token=${token}`); 
-
-        this.ws.onopen = () => {
-            document.getElementById('chatStatus').textContent = '● Connected';
-            console.log('✓ WebSocket connected');
-            this.reconnectAttempts = 0;
-        };
-
-        this.ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
+        
+        try {
+            this.ws = new WebSocket(`${WS_URL}/ws/${roomId}?token=${token}`);
             
-            if (data.type === 'message') {
-                this.addMessageToUI(data);
-            } else if (data.type === 'user_joined') {
-                this.addSystemMessage(`${data.username} joined the chat`);
-            } else if (data.type === 'user_left') {
-                this.addSystemMessage(`${data.username} left the chat`);
-            } else if (data.type === 'error') {
-                console.error('WebSocket error:', data.message);
-                this.showError(data.message);
-            }
-        };
-
-        this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            document.getElementById('chatStatus').textContent = '● Connection error';
-        };
-
-        this.ws.onclose = (event) => {
-            document.getElementById('chatStatus').textContent = '● Disconnected';
-            console.log('WebSocket disconnected');
+            this.ws.onopen = () => {
+                console.log('✅ WebSocket connected successfully');
+                document.getElementById('chatStatus').textContent = '🟢 Connected';
+                this.reconnectAttempts = 0;
+            };
             
-            if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
-                this.reconnectAttempts++;
-                console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-                setTimeout(() => {
-                    if (this.currentRoomId) {
-                        this.connectWebSocket(this.currentRoomId);
-                    }
-                }, 2000 * this.reconnectAttempts);
-            }
-        };
+            this.ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Received:', data.type);
+
+                if (data.type === 'message') {
+                    this.displayMessage(data);
+                }
+                // That's it. Nothing else.
+                // No user_joined, no user_left, no typing, no nothing.
+                // Real presence = API only.
+            };
+            
+            this.ws.onerror = (error) => {
+                console.error('❌ WebSocket error:', error);
+                document.getElementById('chatStatus').textContent = '🔴 Error';
+            };
+            
+            this.ws.onclose = (event) => {
+                console.log('🔌 WebSocket closed:', event.code, event.reason);
+                document.getElementById('chatStatus').textContent = '🟡 Disconnected';
+                
+                // ✅ FIXED: Use currentRoomId consistently
+                if (this.currentRoomId === roomId && this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    const delay = Math.min(3000 * this.reconnectAttempts, 30000);
+                    
+                    console.log(`🔄 Reconnecting in ${delay/1000}s... (attempt ${this.reconnectAttempts})`);
+                    
+                    setTimeout(() => {
+                        if (this.currentRoomId === roomId) {
+                            this.connectWebSocket(roomId);
+                        }
+                    }, delay);
+                }
+            };
+            
+        } catch (error) {
+            console.error('❌ Failed to create WebSocket:', error);
+        }
     },
 
-    addSystemMessage(text) {
+    // ✅ ADDED: Missing method
+    displayMessage(data) {
+        this.addMessageToUI({
+            id: data.id,
+            content: data.content,
+            sender_id: data.sender_id,
+            sender_username: data.sender_username,
+            created_at: data.created_at,
+            sentiment: data.sentiment
+        });
+    },
+
+    // ✅ ADDED: Missing method
+    displaySystemMessage(text) {
         const container = document.getElementById('messagesContainer');
         const messageDiv = document.createElement('div');
         messageDiv.className = 'system-message';
@@ -622,14 +649,14 @@ const app = {
         const input = document.getElementById('messageInput');
         const content = input.value.trim();
 
-        if (!content) {
-            return;
-        }
+        if (!content) return;
 
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
             this.showError('Not connected. Please wait...');
             return;
         }
+
+        console.log('📤 Sending message:', content);
 
         this.ws.send(JSON.stringify({
             content: content,
@@ -714,23 +741,17 @@ if (document.readyState === 'loading') {
     app.init();
 }
 
-
-
 // ============================================
 // MOBILE MENU FUNCTIONALITY
 // ============================================
 
-// Create mobile menu button
 function initMobileMenu() {
-    // Only on mobile
     if (window.innerWidth <= 768) {
         const chatContainer = document.getElementById('chatContainer');
         if (chatContainer && chatContainer.style.display !== 'none') {
-            // Remove existing button
             const existingBtn = document.getElementById('mobileMenuBtn');
             if (existingBtn) existingBtn.remove();
             
-            // Create new button
             const menuBtn = document.createElement('button');
             menuBtn.id = 'mobileMenuBtn';
             menuBtn.className = 'menu-toggle';
@@ -740,7 +761,6 @@ function initMobileMenu() {
             document.body.appendChild(menuBtn);
         }
     } else {
-        // Remove button on desktop
         const existingBtn = document.getElementById('mobileMenuBtn');
         if (existingBtn) existingBtn.remove();
     }
@@ -752,11 +772,9 @@ function toggleMobileSidebar() {
     
     sidebar.classList.toggle('show');
     
-    // Update button icon
     const menuBtn = document.getElementById('mobileMenuBtn');
     if (sidebar.classList.contains('show')) {
         menuBtn.innerHTML = '✕';
-        // Close when clicking outside
         setTimeout(() => {
             document.addEventListener('click', closeSidebarOnClickOutside);
         }, 100);
@@ -777,40 +795,13 @@ function closeSidebarOnClickOutside(e) {
     }
 }
 
-// Also close sidebar when selecting a chat
-const originalLoadChat = app.loadChat;
-app.loadChat = function(roomId) {
-    originalLoadChat.call(this, roomId);
-    
-    // Close sidebar on mobile after selecting chat
-    if (window.innerWidth <= 768) {
-        const sidebar = document.querySelector('.sidebar');
-        const menuBtn = document.getElementById('mobileMenuBtn');
-        if (sidebar && menuBtn) {
-            sidebar.classList.remove('show');
-            menuBtn.innerHTML = '☰';
-            document.removeEventListener('click', closeSidebarOnClickOutside);
-        }
-    }
-};
-
-// Initialize mobile menu when showing chat
-const originalShowChatContainer = app.showChat;
-app.showChat = function() {
-    originalShowChatContainer.call(this);
-    setTimeout(initMobileMenu, 100);
-};
-
-// Handle window resize
 window.addEventListener('resize', () => {
     initMobileMenu();
     
-    // Remove show class on desktop
     if (window.innerWidth > 768) {
         const sidebar = document.querySelector('.sidebar');
         if (sidebar) sidebar.classList.remove('show');
     }
 });
 
-// Initialize on page load
 window.addEventListener('DOMContentLoaded', initMobileMenu);
