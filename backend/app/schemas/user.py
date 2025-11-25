@@ -52,47 +52,16 @@ class TokenRefresh(BaseModel):
     refresh_token: str
 
 
-class PasswordReset(BaseModel):
-    """Schema for password reset request."""
+
+class PasswordResetSimple(BaseModel):
+    """Simple password reset without email verification"""
     email: EmailStr
-
-
-class PasswordResetConfirm(BaseModel):
-    """Schema for password reset confirmation."""
-    token: str
-    new_password: str = Field(..., min_length=8, max_length=100)
-
-
-
-class PasswordResetRequest(BaseModel):
-    """Schema for requesting password reset."""
-    email: EmailStr
-    
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "email": "user@example.com"
-            }
-        }
-    )
-
-
-class PasswordResetConfirm(BaseModel):
-    """Schema for confirming password reset with token."""
-    token: str
     new_password: str = Field(..., min_length=8, max_length=100)
     
-    model_config = ConfigDict(
-        json_schema_extra={
+    class Config:
+        json_schema_extra = {
             "example": {
-                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "email": "user@example.com",
                 "new_password": "newSecurePassword123"
             }
         }
-    )
-
-
-class PasswordResetResponse(BaseModel):
-    """Response after requesting password reset."""
-    message: str
-    email: str

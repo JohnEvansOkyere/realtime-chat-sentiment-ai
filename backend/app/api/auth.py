@@ -6,10 +6,10 @@ Time Complexity: O(1) per endpoint (single DB operation)
 Space Complexity: O(1)
 """
 from fastapi import APIRouter, HTTPException, status, Depends
-from ..schemas.user import UserCreate, UserLogin, TokenResponse, TokenRefresh, UserResponse
+from ..schemas.user import UserCreate, UserLogin, TokenResponse, TokenRefresh, UserResponse, PasswordResetSimple 
 from ..services.auth_service import auth_service
 from .dependencies import get_current_active_user
-from ..schemas.user import PasswordResetRequest, PasswordResetConfirm, PasswordResetResponse
+#from ..schemas.user import PasswordResetRequest, PasswordResetConfirm, PasswordResetResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -112,47 +112,23 @@ async def logout(current_user: UserResponse = Depends(get_current_active_user)):
     return {"message": "Successfully logged out"}
 
 
-@router.post("/forgot-password", response_model=PasswordResetResponse)
-async def forgot_password(request: PasswordResetRequest):
+@router.post("/reset-password-simple")
+async def reset_password_simple(reset_data: PasswordResetSimple):
     """
-    Request password reset email.
-    
-    Business Value: User account recovery
-    Security: Always returns success to prevent email enumeration
+    Simple password reset - just email + new password (NO email verification)
+    ⚠️ Less secure but simpler for development
     """
-    await auth_service.request_password_reset(request.email)
-    
-    return PasswordResetResponse(
-        message="If an account exists with this email, a password reset link has been sent.",
-        email=request.email
+    success = await auth_service.reset_password_simple(
+        reset_data.email,
+        reset_data.new_password
     )
-
-
-@router.post("/reset-password")
-async def reset_password(reset_data: PasswordResetConfirm):
-    """
-    Reset password using token from email.
     
-    Business Value: Secure password recovery
-    """
-    try:
-        success = await auth_service.reset_password(
-            reset_data.token,
-            reset_data.new_password
-        )
-        
-        if success:
-            return {
-                "message": "Password reset successfully. You can now login with your new password."
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to reset password"
-            )
-    
-    except ValueError as e:
+    if not success:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            status_code=404,
+            detail="No account found with this email address"
         )
+    
+    return {
+        "message": "Password updated successfully. You can now login with your new password."
+    }
